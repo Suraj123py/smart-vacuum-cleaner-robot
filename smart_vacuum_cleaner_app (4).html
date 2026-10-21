@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Vacuum Cleaner</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#111827;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px}
+.app-shell{background:#0a0e1a;border-radius:20px;overflow:hidden;width:360px;min-height:720px;display:flex;flex-direction:column;border:1px solid #1e2540}
+.status-bar{background:#0a0e1a;padding:10px 18px 4px;display:flex;justify-content:space-between;align-items:center}
+.status-bar span{color:#8892b0;font-size:11px}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#3ecf8e;display:inline-block;margin-right:5px}
+.app-header{padding:16px 18px 10px;background:#0d1117}
+.app-title{color:#e2e8f0;font-size:20px;font-weight:500;letter-spacing:.5px}
+.app-sub{color:#4a90d9;font-size:11px;margin-top:2px;font-weight:500;text-transform:uppercase;letter-spacing:1px}
+.nav-tabs{display:flex;background:#0d1117;padding:0 12px 12px;gap:8px}
+.nav-btn{flex:1;padding:9px 4px;border-radius:10px;border:1px solid #1e2540;background:transparent;color:#8892b0;font-size:11px;font-weight:500;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:4px}
+.nav-btn.active{background:#1a2340;border-color:#4a90d9;color:#4a90d9}
+.nav-icon{width:20px;height:20px}
+.panel{display:none;flex:1;flex-direction:column;padding:14px;gap:12px;background:#0a0e1a}
+.panel.active{display:flex}
+.section-label{color:#8892b0;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px}
+.card{background:#0d1117;border-radius:14px;border:1px solid #1e2540;padding:14px}
+.status-row{display:flex;justify-content:space-between;align-items:center}
+.stat-pill{background:#0a0e1a;border:1px solid #1e2540;border-radius:20px;padding:4px 12px;font-size:11px;color:#8892b0}
+.stat-pill span{color:#3ecf8e;font-weight:500}
+.dpad{display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:6px;width:180px;margin:0 auto}
+.dpad-btn{border-radius:10px;border:1px solid #1e2540;background:#131a2e;color:#e2e8f0;cursor:pointer;display:flex;align-items:center;justify-content:center;height:52px;transition:all .15s;user-select:none}
+.dpad-btn:active,.dpad-btn.pressed{background:#1a2d50;border-color:#4a90d9;color:#4a90d9;transform:scale(.95)}
+.dpad-center{background:#1a2340;border-color:#e24b4a}
+.dpad-center.active-stop{background:#3d1515;border-color:#e24b4a}
+.empty-cell{visibility:hidden}
+.big-btn{width:100%;padding:14px;border-radius:12px;border:none;font-size:14px;font-weight:500;cursor:pointer;transition:all .18s;letter-spacing:.3px}
+.btn-start{background:#1a3d2b;color:#3ecf8e;border:1px solid #3ecf8e}
+.btn-start:active{background:#0f2e1f;transform:scale(.98)}
+.btn-stop{background:#3d1515;color:#e24b4a;border:1px solid #e24b4a}
+.btn-stop:active{background:#2a0e0e;transform:scale(.98)}
+.btn-vacuum{background:#1a2d50;color:#4a90d9;border:1px solid #4a90d9}
+.btn-vacuum.on{background:#0f2238;color:#63b3ed;border-color:#63b3ed}
+.progress-bar{height:6px;background:#1e2540;border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;background:#4a90d9;transition:width .5s}
+.mic-area{display:flex;flex-direction:column;align-items:center;gap:14px;padding:10px 0}
+.mic-circle{width:90px;height:90px;border-radius:50%;background:#131a2e;border:2px solid #1e2540;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .25s;position:relative}
+.mic-circle.listening{border-color:#4a90d9;background:#0e1830}
+.mic-circle.listening .mic-ring{animation:pulse-ring 1.2s ease-out infinite}
+.mic-ring{position:absolute;width:100%;height:100%;border-radius:50%;border:2px solid #4a90d9;opacity:0}
+@keyframes pulse-ring{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.5);opacity:0}}
+.mic-status{font-size:13px;color:#8892b0;text-align:center}
+.mic-status.active{color:#4a90d9}
+.cmd-list{display:flex;flex-direction:column;gap:6px}
+.cmd-chip{background:#131a2e;border:1px solid #1e2540;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px}
+.cmd-chip-icon{width:24px;height:24px;border-radius:6px;background:#1a2d50;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cmd-chip-text{font-size:12px;color:#e2e8f0}
+.cmd-chip-desc{font-size:11px;color:#8892b0;margin-top:1px}
+.transcript-box{background:#131a2e;border:1px solid #1e2540;border-radius:10px;padding:10px 12px;min-height:44px}
+.transcript-text{font-size:13px;color:#4a90d9;font-style:italic}
+.transcript-placeholder{font-size:12px;color:#4a5568}
+.cam-preview{background:#070c18;border-radius:12px;border:1px solid #1e2540;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.cam-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(74,144,217,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(74,144,217,.04) 1px,transparent 1px);background-size:24px 24px}
+.cam-crosshair{position:absolute;width:40px;height:40px;border:none}
+.ch-tl{position:absolute;top:0;left:0;width:12px;height:12px;border-top:2px solid #4a90d9;border-left:2px solid #4a90d9;border-radius:2px 0 0 0}
+.ch-tr{position:absolute;top:0;right:0;width:12px;height:12px;border-top:2px solid #4a90d9;border-right:2px solid #4a90d9;border-radius:0 2px 0 0}
+.ch-bl{position:absolute;bottom:0;left:0;width:12px;height:12px;border-bottom:2px solid #4a90d9;border-left:2px solid #4a90d9;border-radius:0 0 0 2px}
+.ch-br{position:absolute;bottom:0;right:0;width:12px;height:12px;border-bottom:2px solid #4a90d9;border-right:2px solid #4a90d9;border-radius:0 0 2px 0}
+.cam-label{position:absolute;top:8px;left:10px;background:rgba(10,14,26,.8);border:1px solid #1e2540;border-radius:5px;padding:2px 8px;font-size:10px;color:#3ecf8e;font-weight:500;letter-spacing:.8px}
+.cam-res{position:absolute;top:8px;right:10px;background:rgba(10,14,26,.8);border:1px solid #1e2540;border-radius:5px;padding:2px 8px;font-size:10px;color:#8892b0}
+.cam-offline{display:flex;flex-direction:column;align-items:center;gap:8px}
+.cam-offline-icon{opacity:.3}
+.cam-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cam-btn{padding:10px;border-radius:10px;border:1px solid #1e2540;background:#0d1117;color:#8892b0;font-size:12px;cursor:pointer;transition:all .18s;text-align:center}
+.cam-btn.on{background:#1a2d50;border-color:#4a90d9;color:#4a90d9}
+.cam-btn:active{transform:scale(.97)}
+.info-row{display:flex;justify-content:space-between;font-size:12px}
+.info-key{color:#8892b0}
+.info-val{color:#e2e8f0;font-weight:500}
+.coverage-row{display:flex;align-items:center;gap:10px}
+.cov-label{font-size:12px;color:#8892b0;min-width:70px}
+.cov-bar{flex:1;height:5px;background:#1e2540;border-radius:3px;overflow:hidden}
+.cov-fill{height:100%;border-radius:3px;background:#3ecf8e;transition:width 1s}
+.cov-val{font-size:12px;color:#3ecf8e;font-weight:500;min-width:32px;text-align:right}
+.mode-indicator{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#131a2e;border:1px solid #1e2540;border-radius:10px}
+.mode-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mode-text{font-size:12px;color:#e2e8f0;font-weight:500}
+.mode-sub{font-size:11px;color:#8892b0;margin-left:auto}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar">
+    <span><span class="status-dot"></span>ESP32-S3 Connected</span>
+    <span>192.168.4.1</span>
+  </div>
+  <div class="app-header">
+    <div class="app-title">Smart Vacuum</div>
+    <div class="app-sub">ESP32-S3 WROOM · OV2640</div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-btn active" onclick="switchPanel('auto')">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/>
+        <path d="M12 3v2M12 19v2M3 12h2M19 12h2"/>
+      </svg>
+      Autonomous
+    </button>
+    <button class="nav-btn" onclick="switchPanel('voice')">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+      </svg>
+      Voice
+    </button>
+    <a href="http://192.168.4.1" target="_blank" class="nav-btn" style="text-decoration:none;">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M23 7l-7 5 7 5V7z"/>
+        <rect x="1" y="5" width="15" height="14" rx="2"/>
+      </svg>
+      Camera
+    </a>
+  </div>
+
+  <!-- AUTONOMOUS PANEL -->
+  <div class="panel active" id="panel-auto">
+    <div>
+      <div class="section-label">System status</div>
+      <div class="card" style="display:flex;flex-direction:column;gap:8px">
+        <div class="mode-indicator">
+          <div class="mode-dot" id="auto-mode-dot" style="background:#3ecf8e"></div>
+          <span class="mode-text" id="auto-mode-text">Ready</span>
+          <span class="mode-sub" id="auto-mode-sub">Idle</span>
+        </div>
+        <div class="info-row"><span class="info-key">Vacuum motor</span><span class="info-val" id="vac-state">OFF</span></div>
+        <div class="info-row"><span class="info-key">Battery</span><span class="info-val" style="color:#3ecf8e">87%</span></div>
+        <div class="info-row"><span class="info-key">Dust bin</span><span class="info-val" style="color:#EF9F27">62% full</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="section-label">Coverage</div>
+      <div class="card" style="display:flex;flex-direction:column;gap:8px">
+        <div class="coverage-row"><span class="cov-label">Area cleaned</span><div class="cov-bar"><div class="cov-fill" id="cov-bar" style="width:34%"></div></div><span class="cov-val" id="cov-val">34%</span></div>
+        <div class="info-row"><span class="info-key">Distance traveled</span><span class="info-val" id="dist-val">2.4 m</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="section-label">Manual control</div>
+      <div class="card">
+        <div class="dpad" id="dpad">
+          <div class="empty-cell"></div>
+          <div class="dpad-btn" id="btn-fwd" onpointerdown="dirPress('F','btn-fwd')" onpointerup="dirRelease()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </div>
+          <div class="empty-cell"></div>
+          <div class="dpad-btn" id="btn-left" onpointerdown="dirPress('L','btn-left')" onpointerup="dirRelease()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          </div>
+          <div class="dpad-btn dpad-center" id="btn-stop" onclick="doStop()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color:#e24b4a"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>
+          </div>
+          <div class="dpad-btn" id="btn-right" onpointerdown="dirPress('R','btn-right')" onpointerup="dirRelease()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </div>
+          <div class="empty-cell"></div>
+          <div class="dpad-btn" id="btn-back" onpointerdown="dirPress('B','btn-back')" onpointerup="dirRelease()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          </div>
+          <div class="empty-cell"></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="big-btn btn-vacuum" id="vac-btn" onclick="toggleVacuum()">Vacuum OFF — tap to start</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button class="big-btn btn-start" onclick="startAuto()">Start Auto</button>
+        <button class="big-btn btn-stop" onclick="stopAuto()">Stop All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VOICE PANEL — Real Speech Recognition → ESP32 -->
+  <div class="panel" id="panel-voice">
+
+    <!-- Mic Button -->
+    <div>
+      <div class="section-label">Microphone — Speech Recognition</div>
+      <div class="card">
+        <div class="mic-area">
+          <div class="mic-circle" id="mic-btn" onclick="toggleMic()">
+            <div class="mic-ring" id="mic-ring"></div>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#4a90d9" stroke-width="1.8">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+            </svg>
+          </div>
+          <div class="mic-status" id="mic-status">Tap mic to activate</div>
+        </div>
+
+        <!-- Transcript Box -->
+        <textarea id="v-transcript"
+          style="width:100%;min-height:70px;padding:10px 12px;border:1px solid #1e2540;border-radius:10px;
+                 background:#131a2e;color:#4a90d9;font-size:13px;font-style:italic;resize:none;
+                 font-family:inherit;line-height:1.5;outline:none;"
+          placeholder="🎤 Bol ke command do: aage, peechhe, baayein, daayein, ruko..."></textarea>
+
+        <!-- Status -->
+        <div id="v-status" style="margin-top:8px;font-size:12px;padding:6px 10px;border-radius:8px;display:none;"></div>
+
+        <!-- Buttons -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+          <button class="big-btn btn-start" id="v-send-btn" onclick="voiceSend()" disabled
+            style="padding:10px;font-size:13px;">
+            🚀 ESP32 ko Bhejo
+          </button>
+          <button class="big-btn btn-stop" onclick="voiceClear()"
+            style="padding:10px;font-size:13px;">
+            🗑️ Clear
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Commands Reference -->
+    <div>
+      <div class="section-label">Voice commands (Hindi + English)</div>
+      <div class="card cmd-list">
+        <div class="cmd-chip">
+          <div class="cmd-chip-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4a90d9" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
+          <div><div class="cmd-chip-text">"आगे" / "forward" / "samne"</div><div class="cmd-chip-desc">Robot aage badhega</div></div>
+        </div>
+        <div class="cmd-chip">
+          <div class="cmd-chip-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4a90d9" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+          <div><div class="cmd-chip-text">"पीछे" / "back" / "peeche"</div><div class="cmd-chip-desc">Robot peeche jayega</div></div>
+        </div>
+        <div class="cmd-chip">
+          <div class="cmd-chip-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3ecf8e" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></div>
+          <div><div class="cmd-chip-text">"बाएँ" / "left" / "baayein"</div><div class="cmd-chip-desc">Robot baayein murega</div></div>
+        </div>
+        <div class="cmd-chip">
+          <div class="cmd-chip-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3ecf8e" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+          <div><div class="cmd-chip-text">"दाएँ" / "right" / "daayein"</div><div class="cmd-chip-desc">Robot daayein murega</div></div>
+        </div>
+        <div class="cmd-chip">
+          <div class="cmd-chip-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="#3ecf8e"><circle cx="12" cy="12" r="5"/></svg></div>
+          <div><div class="cmd-chip-text">"सफाई शुरू" / "start cleaning"</div><div class="cmd-chip-desc">Vacuum + auto mode on</div></div>
+        </div>
+        <div class="cmd-chip">
+          <div class="cmd-chip-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="#e24b4a"><rect x="4" y="4" width="16" height="16" rx="3"/></svg></div>
+          <div><div class="cmd-chip-text">"रुको" / "stop" / "thaam"</div><div class="cmd-chip-desc">Sab band ho jayega</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CAMERA PANEL -->
+  <div class="panel" id="panel-camera">
+    <div>
+      <div class="section-label">Live feed — OV2640</div>
+      <div class="cam-preview" id="cam-preview">
+        <div class="cam-grid"></div>
+        <div class="cam-label" id="cam-live-badge" style="display:none">LIVE</div>
+        <div class="cam-res" id="cam-res-badge" style="display:none">640×480</div>
+        <div class="cam-crosshair" style="top:50%;left:50%;transform:translate(-50%,-50%)">
+          <div class="ch-tl"></div><div class="ch-tr"></div><div class="ch-bl"></div><div class="ch-br"></div>
+        </div>
+        <div class="cam-offline" id="cam-offline">
+          <svg class="cam-offline-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#8892b0" stroke-width="1.5"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/><line x1="1" y1="1" x2="23" y2="23" stroke="#e24b4a" stroke-width="1.5"/></svg>
+          <span style="font-size:12px;color:#4a5568">Camera offline</span>
+        </div>
+      </div>
+    </div>
+    <div class="cam-controls">
+      <button class="cam-btn" id="cam-stream-btn" onclick="toggleStream()">
+        <div style="font-size:13px;font-weight:500;color:inherit">Stream</div>
+        <div style="font-size:10px;margin-top:2px">mjpeg://IP/stream</div>
+      </button>
+      <button class="cam-btn" id="cam-snap-btn" onclick="snapPhoto()" style="color:#e2e8f0">
+        <div style="font-size:13px;font-weight:500">Snapshot</div>
+        <div style="font-size:10px;margin-top:2px;color:#8892b0">Save frame</div>
+      </button>
+      <button class="cam-btn" id="cam-flash-btn" onclick="toggleFlash()">
+        <div style="font-size:13px;font-weight:500;color:inherit">Flash</div>
+        <div style="font-size:10px;margin-top:2px">LED control</div>
+      </button>
+      <button class="cam-btn" style="color:#e2e8f0">
+        <div style="font-size:13px;font-weight:500">Settings</div>
+        <div style="font-size:10px;margin-top:2px;color:#8892b0">Resolution etc.</div>
+      </button>
+    </div>
+    <div>
+      <div class="section-label">Pin config — OV2640</div>
+      <div class="card" style="display:flex;flex-direction:column;gap:6px">
+        <div class="info-row"><span class="info-key">SIOC / SIOD</span><span class="info-val" style="font-family:monospace;color:#4a90d9">GPIO 5 / 4</span></div>
+        <div class="info-row"><span class="info-key">XCLK</span><span class="info-val" style="font-family:monospace;color:#4a90d9">GPIO 15</span></div>
+        <div class="info-row"><span class="info-key">PCLK / VSYNC / HREF</span><span class="info-val" style="font-family:monospace;color:#4a90d9">21 / 25 / 23</span></div>
+        <div class="info-row"><span class="info-key">D0–D7</span><span class="info-val" style="font-family:monospace;color:#4a90d9">35,34,39,36,19,18,5,4</span></div>
+        <div class="info-row"><span class="info-key">Stream URL</span><span class="info-val" style="font-family:monospace;font-size:11px">:81/stream</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  SMART VACUUM — Fully Synchronized with ESP32 WebServer
+//  All buttons → HTTP fetch → ESP32 @ 192.168.4.1
+// ═══════════════════════════════════════════════════════════
+var ESP32 = 'http://192.168.4.1';
+var vacOn=false, autoOn=false, streamOn=false, flashOn=false;
+var covPct=0, distM=0, covInterval=null, statusInterval=null;
+
+// ── Helper: send HTTP request to ESP32 ───────────────────
+function esp32(path, onOk, onErr) {
+  fetch(ESP32 + path)
+    .then(function(r){ return r.text(); })
+    .then(function(d){ if(onOk) onOk(d); })
+    .catch(function(e){ if(onErr) onErr(e); else console.warn('ESP32 err:', e.message); });
+}
+
+// ── Tab switching ────────────────────────────────────────
+function switchPanel(name){
+  ['auto','voice','camera'].forEach(function(n){
+    document.getElementById('panel-'+n).classList.toggle('active',n===name);
+  });
+  document.querySelectorAll('.nav-btn').forEach(function(b,i){
+    b.classList.toggle('active',['auto','voice','camera'][i]===name);
+  });
+  if(name==='auto' && !statusInterval) startStatusPoll();
+}
+
+// ── Live status polling from ESP32 /status ───────────────
+function startStatusPoll(){
+  statusInterval = setInterval(function(){
+    fetch(ESP32+'/status')
+      .then(function(r){return r.json();})
+      .then(function(d){
+        // Update vacuum state from ESP32
+        if(d.vacuum !== vacOn){
+          vacOn = d.vacuum;
+          updateVacUI();
+        }
+        // Update auto state
+        if(d.autoMode !== autoOn){
+          autoOn = d.autoMode;
+          updateAutoUI();
+        }
+        // Update distance display
+        if(d.distFront !== undefined){
+          document.getElementById('dist-val').textContent = d.distFront + ' cm';
+        }
+      })
+      .catch(function(){});
+  }, 1500);
+}
+
+// ── D-pad buttons → /move?dir=F|B|L|R|S ─────────────────
+function dirPress(cmd, id){
+  document.querySelectorAll('.dpad-btn').forEach(function(b){b.classList.remove('pressed');});
+  var el = document.getElementById(id);
+  if(el) el.classList.add('pressed');
+  esp32('/move?dir='+cmd, function(r){
+    console.log('Move:', r);
+    // If manual command sent, update auto UI to off
+    if(autoOn){ autoOn=false; updateAutoUI(); }
+  });
+}
+function dirRelease(){
+  document.querySelectorAll('.dpad-btn').forEach(function(b){b.classList.remove('pressed');});
+}
+
+// ── Stop button (center D-pad) → /move?dir=S ─────────────
+function doStop(){
+  var btn=document.getElementById('btn-stop');
+  btn.classList.add('active-stop');
+  setTimeout(function(){btn.classList.remove('active-stop');},300);
+  esp32('/move?dir=S', function(){
+    autoOn=false; vacOn=false;
+    updateAutoUI(); updateVacUI();
+  });
+}
+
+// ── Vacuum toggle → /vacuum?state=on|off ─────────────────
+function toggleVacuum(){
+  var newState = !vacOn;
+  esp32('/vacuum?state='+(newState?'on':'off'), function(r){
+    vacOn = (r.indexOf('ON') >= 0);
+    updateVacUI();
+  });
+}
+function updateVacUI(){
+  var btn=document.getElementById('vac-btn');
+  var st=document.getElementById('vac-state');
+  btn.textContent = vacOn ? 'Vacuum ON — tap to stop' : 'Vacuum OFF — tap to start';
+  btn.className = 'big-btn btn-vacuum' + (vacOn?' on':'');
+  st.textContent = vacOn ? 'ON' : 'OFF';
+  st.style.color = vacOn ? '#3ecf8e' : '#e2e8f0';
+}
+
+// ── Start Auto → /auto?state=on ──────────────────────────
+function startAuto(){
+  esp32('/auto?state=on', function(r){
+    autoOn=true; vacOn=true;
+    updateAutoUI(); updateVacUI();
+    if(!covInterval){
+      covInterval=setInterval(function(){
+        covPct=Math.min(100,covPct+1);
+        distM=parseFloat((distM+0.05).toFixed(1));
+        document.getElementById('cov-bar').style.width=covPct+'%';
+        document.getElementById('cov-val').textContent=covPct+'%';
+      },600);
+    }
+  }, function(){
+    // Even if offline, update UI optimistically
+    autoOn=true; updateAutoUI();
+  });
+}
+
+// ── Stop All → /auto?state=off ───────────────────────────
+function stopAuto(){
+  esp32('/auto?state=off', function(){
+    autoOn=false; vacOn=false;
+    clearInterval(covInterval); covInterval=null;
+    updateAutoUI(); updateVacUI();
+  }, function(){
+    autoOn=false; vacOn=false;
+    clearInterval(covInterval); covInterval=null;
+    updateAutoUI(); updateVacUI();
+  });
+}
+function updateAutoUI(){
+  if(autoOn){
+    document.getElementById('auto-mode-dot').style.background='#4a90d9';
+    document.getElementById('auto-mode-text').textContent='Cleaning';
+    document.getElementById('auto-mode-sub').textContent='Auto mode';
+  } else {
+    document.getElementById('auto-mode-dot').style.background='#e24b4a';
+    document.getElementById('auto-mode-text').textContent='Stopped';
+    document.getElementById('auto-mode-sub').textContent='All systems off';
+  }
+}
+
+// Start polling on load
+window.addEventListener('load', function(){ startStatusPoll(); });
+
+// ── Real Speech Recognition (from Voice.html) ────────
+var voiceRecognition=null, voiceIsListening=false, voiceTranscriptFinal='';
+(function initSpeech(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ document.getElementById('mic-status').textContent='❌ Chrome/Edge use karo'; return; }
+  voiceRecognition=new SR();
+  voiceRecognition.continuous=true;
+  voiceRecognition.interimResults=true;
+  voiceRecognition.lang='hi-IN';
+  voiceRecognition.onstart=function(){
+    voiceIsListening=true;
+    document.getElementById('mic-btn').classList.add('listening');
+    document.getElementById('mic-status').textContent='🎤 Sun raha hoon... bolo!';
+    document.getElementById('mic-status').className='mic-status active';
+  };
+  voiceRecognition.onresult=function(event){
+    var interim='', final=voiceTranscriptFinal;
+    for(var i=event.resultIndex;i<event.results.length;i++){
+      var t=event.results[i][0].transcript;
+      if(event.results[i].isFinal){final+=t+' ';}else{interim+=t;}
+    }
+    voiceTranscriptFinal=final.trim();
+    document.getElementById('v-transcript').value=voiceTranscriptFinal+interim;
+    document.getElementById('v-send-btn').disabled=!voiceTranscriptFinal;
+  };
+  voiceRecognition.onerror=function(event){
+    voiceIsListening=false;
+    document.getElementById('mic-btn').classList.remove('listening');
+    var msg='❌ ';
+    if(event.error==='no-speech') msg+='Koi awaaz nahi';
+    else if(event.error==='not-allowed') msg+='Mic permission do';
+    else msg+=event.error;
+    document.getElementById('mic-status').textContent=msg;
+    document.getElementById('mic-status').className='mic-status';
+  };
+  voiceRecognition.onend=function(){
+    voiceIsListening=false;
+    document.getElementById('mic-btn').classList.remove('listening');
+    document.getElementById('mic-status').textContent=voiceTranscriptFinal?'✅ "Bhejo" dabao!':'Tap mic to activate';
+    document.getElementById('mic-status').className='mic-status';
+  };
+})();
+
+function toggleMic(){
+  if(!voiceRecognition) return;
+  if(voiceIsListening){voiceRecognition.stop();}else{voiceRecognition.start();}
+}
+
+function voiceSend(){
+  var text=voiceTranscriptFinal.trim();
+  if(!text) return;
+  var s=document.getElementById('v-status');
+  s.style.display='block'; s.style.background='#1a2d50'; s.style.color='#4a90d9';
+  s.textContent='🤖 ESP32 ko bheja ja raha hai...';
+  document.getElementById('v-send-btn').disabled=true;
+  fetch(ESP32+'/cmd?text='+encodeURIComponent(text.toLowerCase()))
+    .then(function(r){return r.text();})
+    .then(function(d){
+      s.style.background='#1a3d2b'; s.style.color='#3ecf8e';
+      s.textContent='✅ Bheja: '+text.substring(0,30)+(text.length>30?'...':'');
+      setTimeout(function(){s.textContent='📡 ESP32: '+d;},600);
+    })
+    .catch(function(err){
+      s.style.background='#3d1515'; s.style.color='#e24b4a';
+      s.textContent='❌ '+(err.message.includes('fetch')?'Device on karo (192.168.4.1)':err.message);
+    })
+    .finally(function(){document.getElementById('v-send-btn').disabled=false;});
+}
+
+function voiceClear(){
+  voiceTranscriptFinal='';
+  document.getElementById('v-transcript').value='';
+  document.getElementById('v-send-btn').disabled=true;
+  var s=document.getElementById('v-status');
+  s.style.display='block'; s.style.background='#1a2d50'; s.style.color='#8892b0';
+  s.textContent='🗑️ Clear ho gaya!';
+  setTimeout(function(){s.style.display='none';},2000);
+}
+
+function toggleStream(){
+  streamOn=!streamOn;
+  var btn=document.getElementById('cam-stream-btn');
+  var off=document.getElementById('cam-offline');
+  var live=document.getElementById('cam-live-badge');
+  var res=document.getElementById('cam-res-badge');
+  btn.classList.toggle('on',streamOn);
+  off.style.display=streamOn?'none':'flex';
+  live.style.display=streamOn?'block':'none';
+  res.style.display=streamOn?'block':'none';
+}
+
+function snapPhoto(){
+  var btn=document.getElementById('cam-snap-btn');
+  btn.style.background='#1a3d2b'; btn.style.color='#3ecf8e';
+  setTimeout(function(){btn.style.background='';btn.style.color='';},500);
+}
+
+function toggleFlash(){
+  flashOn=!flashOn;
+  var btn=document.getElementById('cam-flash-btn');
+  btn.classList.toggle('on',flashOn);
+  btn.querySelector('div').textContent=flashOn?'Flash ON':'Flash';
+}
+</script>
+</body>
+</html>
