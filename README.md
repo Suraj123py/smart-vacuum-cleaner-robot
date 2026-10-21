@@ -38,5 +38,4 @@ and cliff detection, a camera, and web-based control.
 - CPU starvation, solved with the dual-core FreeRTOS design
 - Compatibility with ESP32 Arduino Core v3.x
 
-## Photos
-Add pictures of the robot here.
+
