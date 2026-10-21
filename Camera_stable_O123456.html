@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 Camera Stable Stream</title>
+  <link rel="preconnect" href="http://192.168.4.1">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #101418;
+      color: #f5f7fa;
+      padding: 16px;
+    }
+
+    .container {
+      width: min(1100px, 100%);
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .status {
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 14px;
+      background: #26313d;
+      color: #dce6f2;
+    }
+
+    .status.ok {
+      background: #123d27;
+      color: #baf4cf;
+    }
+
+    .status.warn {
+      background: #4a3510;
+      color: #ffe0a3;
+    }
+
+    .status.err {
+      background: #4b1717;
+      color: #ffc1c1;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .video-section,
+    .controls-panel {
+      background: #181f26;
+      border: 1px solid #2b3540;
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .stream-wrap {
+      background: #050607;
+      border-radius: 6px;
+      overflow: hidden;
+      aspect-ratio: 4 / 3;
+      display: flex;
+    }
+
+    #stream {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      background: #050607;
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    button,
+    select,
+    input {
+      width: 100%;
+      font-size: 15px;
+      border-radius: 6px;
+    }
+
+    button {
+      border: 0;
+      padding: 10px 12px;
+      background: #2f80ed;
+      color: white;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    button.secondary {
+      background: #364350;
+    }
+
+    button.danger {
+      background: #c24141;
+    }
+
+    .control-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: #cdd6df;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    select,
+    input {
+      padding: 9px;
+      border: 1px solid #3b4652;
+      background: #11171d;
+      color: #f5f7fa;
+    }
+
+    .value {
+      display: inline-block;
+      margin-top: 6px;
+      color: #9fb0c2;
+      font-size: 13px;
+    }
+
+    .hint {
+      margin-top: 12px;
+      color: #9fb0c2;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 820px) {
+      body {
+        padding: 10px;
+      }
+
+      .header {
+        display: block;
+      }
+
+      .status {
+        display: inline-block;
+        margin-top: 10px;
+      }
+
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .button-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>ESP32 Camera</h1>
+      <div id="status" class="status warn">Ready</div>
+    </div>
+
+    <div class="main-grid">
+      <div class="video-section">
+        <div class="stream-wrap">
+          <img id="stream" alt="Live camera stream">
+        </div>
+
+        <div class="button-row">
+          <button onclick="restartStream(true)">Restart Stream</button>
+          <button class="secondary" onclick="openDirectStream()">Open Direct</button>
+          <button class="danger" onclick="resetAll()">Reset</button>
+        </div>
+
+        <div class="hint">
+          Keep resolution at QVGA or QQVGA for the most stable ESP32 live stream.
+        </div>
+      </div>
+
+      <div class="controls-panel">
+        <div class="control-group">
+          <label for="cameraIp">Camera IP</label>
+          <input id="cameraIp" value="192.168.4.1" onchange="saveIpAndRestart()">
+        </div>
+
+        <div class="control-group">
+          <label for="resolution">Resolution</label>
+          <select id="resolution" onchange="setResolution()">
+            <option value="0">QQVGA 160x120 - fastest</option>
+            <option value="5" selected>QVGA 320x240 - stable</option>
+            <option value="6">CIF 400x296</option>
+            <option value="8">VGA 640x480</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="quality">JPEG Quality</label>
+          <input type="range" id="quality" min="10" max="30" value="14" oninput="setQualityDebounced()">
+          <span id="qualityValue" class="value">14</span>
+        </div>
+
+        <div class="control-group">
+          <label for="brightness">Brightness</label>
+          <input type="range" id="brightness" min="-2" max="2" value="0" step="1" oninput="setBrightnessDebounced()">
+          <span id="brightnessValue" class="value">0</span>
+        </div>
+
+        <div class="control-group">
+          <label for="contrast">Contrast</label>
+          <input type="range" id="contrast" min="-2" max="2" value="0" step="1" oninput="setContrastDebounced()">
+          <span id="contrastValue" class="value">0</span>
+        </div>
+
+        <div class="control-group">
+          <label for="saturation">Saturation</label>
+          <input type="range" id="saturation" min="-2" max="2" value="0" step="1" oninput="setSaturationDebounced()">
+          <span id="saturationValue" class="value">0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const stream = document.getElementById('stream');
+    const statusBox = document.getElementById('status');
+    const ipInput = document.getElementById('cameraIp');
+
+    let reconnectTimer = null;
+    let commandTimer = null;
+    let reconnecting = false;
+    let streamStarted = false;
+    let streamFailures = 0;
+
+    const savedIp = localStorage.getItem('esp32CameraIp');
+    if (savedIp) {
+      ipInput.value = savedIp;
+    }
+
+    function baseUrl() {
+      return `http://${ipInput.value.trim()}`;
+    }
+
+    function streamUrl() {
+      return `${baseUrl()}/stream?t=${Date.now()}`;
+    }
+
+    function setStatus(text, type = 'ok') {
+      statusBox.textContent = text;
+      statusBox.className = `status ${type}`;
+    }
+
+    function restartStream(forceReload = false) {
+      clearTimeout(reconnectTimer);
+      reconnecting = false;
+
+      if (streamStarted && !forceReload) {
+        setStatus('Live stream already running', 'ok');
+        return;
+      }
+
+      setStatus('Connecting stream...', 'warn');
+      streamStarted = true;
+      stream.src = streamUrl();
+      setStatus('Stream requested', 'ok');
+    }
+
+    stream.onload = () => {
+      streamFailures = 0;
+      setStatus('Live stream connected', 'ok');
+    };
+
+    stream.onerror = () => {
+      if (reconnecting) return;
+
+      reconnecting = true;
+      streamFailures++;
+      setStatus('Stream dropped, reconnecting...', 'err');
+
+      reconnectTimer = setTimeout(() => {
+        restartStream(true);
+        reconnecting = false;
+      }, 3000);
+    };
+
+    async function sendCommand(path, value = '') {
+      const query = value !== '' ? `?val=${encodeURIComponent(value)}` : '';
+      const url = `${baseUrl()}${path}${query}`;
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3500);
+        const response = await fetch(url, {
+          signal: controller.signal,
+          cache: 'no-store'
+        });
+
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        return true;
+      } catch (error) {
+        setStatus('Command failed', 'err');
+        return false;
+      }
+    }
+
+    function debounceCommand(callback) {
+      clearTimeout(commandTimer);
+      commandTimer = setTimeout(callback, 350);
+    }
+
+    async function setResolution() {
+      const value = document.getElementById('resolution').value;
+
+      if (await sendCommand('/resolution', value)) {
+        setStatus('Resolution changed', 'ok');
+        setTimeout(() => restartStream(true), 500);
+      }
+    }
+
+    function setQualityDebounced() {
+      const el = document.getElementById('quality');
+      document.getElementById('qualityValue').textContent = el.value;
+      debounceCommand(() => sendCommand('/quality', el.value));
+    }
+
+    function setBrightnessDebounced() {
+      const el = document.getElementById('brightness');
+      document.getElementById('brightnessValue').textContent = el.value;
+      debounceCommand(() => sendCommand('/brightness', el.value));
+    }
+
+    function setContrastDebounced() {
+      const el = document.getElementById('contrast');
+      document.getElementById('contrastValue').textContent = el.value;
+      debounceCommand(() => sendCommand('/contrast', el.value));
+    }
+
+    function setSaturationDebounced() {
+      const el = document.getElementById('saturation');
+      document.getElementById('saturationValue').textContent = el.value;
+      debounceCommand(() => sendCommand('/saturation', el.value));
+    }
+
+    function openDirectStream() {
+      window.open(`${baseUrl()}/stream`, '_blank');
+    }
+
+    async function resetAll() {
+      document.getElementById('resolution').value = '5';
+      document.getElementById('quality').value = '14';
+      document.getElementById('brightness').value = '0';
+      document.getElementById('contrast').value = '0';
+      document.getElementById('saturation').value = '0';
+      document.getElementById('qualityValue').textContent = '14';
+      document.getElementById('brightnessValue').textContent = '0';
+      document.getElementById('contrastValue').textContent = '0';
+      document.getElementById('saturationValue').textContent = '0';
+
+      if (await sendCommand('/reset')) {
+        setStatus('Settings reset', 'ok');
+        setTimeout(() => restartStream(true), 500);
+      }
+    }
+
+    function saveIpAndRestart() {
+      localStorage.setItem('esp32CameraIp', ipInput.value.trim());
+      restartStream(true);
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && !streamStarted) {
+        restartStream(false);
+      }
+    });
+
+    restartStream(false);
+  </script>
+</body>
+</html>
